@@ -1,0 +1,15 @@
+
+check curr status
+
+proc {
+	priority;
+	ticks;
+}
+
+
+For every tick, run the whole for(p = ptable.proc; p < &ptable.proc[NPROC]; p++)
+to find out the best proc* to run.
+make corresponding changes.
+
+
+
