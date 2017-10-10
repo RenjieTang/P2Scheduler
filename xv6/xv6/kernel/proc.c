@@ -5,6 +5,7 @@
 #include "x86.h"
 #include "proc.h"
 #include "spinlock.h"
+#include "pstat.h"
 
 struct {
   struct spinlock lock;
@@ -261,7 +262,9 @@ void
 scheduler(void)
 {
   struct proc *p;
-  struct proc *prev;
+  int timeslice[4] = {0, 32, 16, 8};
+ // struct proc *prev;
+  struct proc *curr;
 
   for(;;){
     // Enable interrupts on this processor.
@@ -269,97 +272,74 @@ scheduler(void)
 
     // Loop over process table looking for process to run.
     acquire(&ptable.lock);
-    int maxSoFar = -1;
-    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-      if(p->state != RUNNABLE)
+    for(curr = ptable.proc; curr < &ptable.proc[NPROC];) {
+      if(curr->state != RUNNABLE) {
+        curr++;
         continue;
-
-      if(prev == NULL) {
-        if(p->priority > maxSoFar) {
-          maxSoFar = p->priority;
-          proc = p;
-        }
       }
-      else {
-        if(p->priority > prev->priority) {
-          proc = p;        
-          break;
-        }
-      }
-    
-    }
-
-    //
-    if(prev!=NULL) {
-      proc = prev;
-    }
-
-    switchuvm(proc);
-    proc->state = RUNNING;
-    swtch(&cpu->scheduler, proc->context);
-    switchkvm();
-
-
-    proc->ticks++;
-    proc->acc_ticks[proc->priority]++;
-
-    //run
-    if ((proc->priority != 0) && proc->ticks == (3-proc->priority+1)*8) {
-      proc->priority--;
-      proc->ticks = 0;
-    }
-    
-
-    //wait
-    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
-      if(p->state != RUNNABLE)
-        continue;
-
-      if(p!=proc) {
-        p->wait_ticks++;
-        p->acc_wait_ticks[p->priority]++;
-        if(p->priority == 2 && (p->wait_ticks == 160)) {
-          p->priority++;
-          p->wait_ticks = 0;
-        }
-        else if(p->priority == 1 && (p->wait_ticks == 320)) {
-          p->priority++;
-          p->wait_ticks = 0;
-        }
-        else if(p->priority == 0 && (p->wait_ticks == 500)) {
-          p->priority++;
-          p->wait_ticks = 0;
-        }
-        else {
+      int maxSoFar = curr->priority;
+      for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+        if(p->state != RUNNABLE)
+          continue;
           
+        if(p->priority > maxSoFar) {
+            maxSoFar = p->priority;
+            curr = p;
+          }
+      
+      }
+
+      //switch
+      proc = curr;
+      switchuvm(curr);
+      curr->state = RUNNING;
+      swtch(&cpu->scheduler, proc->context);
+      switchkvm();
+
+ 
+
+      //waiting ticks and upgrade
+      curr->wait_ticks = 0;
+      for(p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
+        if(p->state != RUNNABLE)
+          continue;
+        if(p!=curr) {
+          p->wait_ticks++;
+          p->acc_wait_ticks[p->priority]++;
+          if(p->priority == 2 && (p->wait_ticks == 160)) {
+            p->priority++;
+            p->wait_ticks = 0;
+          }
+          else if(p->priority == 1 && (p->wait_ticks == 320)) {
+            p->priority++;
+            p->wait_ticks = 0;
+          }
+          else if(p->priority == 0 && (p->wait_ticks == 500)) {
+            p->priority++;
+            p->wait_ticks = 0;
+          }
+          else {
+            
+          }
         }
       }
-    }
 
-
-
-    if(prev->state != RUNNABLE) {
-      prev = NULL;
-    }
-    else {
-      prev = proc;
-    }
-
-
-
-      // proc = p;
-      // switchuvm(p);
-      // p->state = RUNNING;
-      // swtch(&cpu->scheduler, proc->context);
-      // switchkvm();
-
-      // Process is done running for now.
-      // It should have changed its p->state before coming back.
-    proc = 0;
-
-
-
-    release(&ptable.lock);
+      //running ticks and downgrade
+      curr->ticks++;
+      curr->acc_ticks[curr->priority]++;
+      // if ((curr->priority != 0) && curr->ticks == (3-curr->priority+1)*8) {
+      //   curr->priority--;
+      //   curr->ticks = 0;
+      //   curr++;
+      // }
+      if((curr->priority != 0 && curr->ticks == timeslice[curr->priority])) {
+        curr->priority--;
+        curr->ticks = 0;
+        curr++;
+      }
+      proc = 0;
+  }
+  release(&ptable.lock);
 
   }
 }
@@ -520,6 +500,29 @@ procdump(void)
     }
     cprintf("\n");
   }
+}
+
+int
+getpinfo(struct pstat *info)
+{
+  struct proc *p;
+  int i = 0;
+  acquire(&ptable.lock);
+  for (p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
+    info->inuse[i] = (p->state == UNUSED) ? 0 : 1;
+    info->pid[i] = p->pid;
+    info->priority[i] = p->priority;
+    info->state[i] = p->state;
+
+    for(int j = 0; j < 4; j++) {
+      info->ticks[i][j] = p->acc_ticks[j];
+      info->wait_ticks[i][j] = p->acc_wait_ticks[j];
+    }
+
+    i++;
+  }
+  release(&ptable.lock);
+  return 0;
 }
 
 

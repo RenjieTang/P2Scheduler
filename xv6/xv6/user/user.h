@@ -2,6 +2,8 @@
 #define _USER_H_
 
 struct stat;
+struct pstat;
+enum procstate { UNUSED, EMBRYO, SLEEPING, RUNNABLE, RUNNING, ZOMBIE };
 
 // system calls
 int fork(void);
@@ -25,6 +27,7 @@ int getpid(void);
 char* sbrk(int);
 int sleep(int);
 int uptime(void);
+int getpinfo(struct pstat*);
 
 // user library functions (ulib.c)
 int stat(char*, struct stat*);
