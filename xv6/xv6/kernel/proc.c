@@ -68,6 +68,11 @@ found:
   memset(p->context, 0, sizeof *p->context);
   p->context->eip = (uint)forkret;
 
+  p->priority = 3;
+  p->ticks = 0;
+  p->wait_ticks = 0;
+  memset(p->acc_ticks, 0, 4*sizeof(int));
+  memset(p->acc_wait_ticks, 0, 4*sizeof(int));
   return p;
 }
 
@@ -256,6 +261,7 @@ void
 scheduler(void)
 {
   struct proc *p;
+  struct proc *prev;
 
   for(;;){
     // Enable interrupts on this processor.
@@ -263,23 +269,96 @@ scheduler(void)
 
     // Loop over process table looking for process to run.
     acquire(&ptable.lock);
+    int maxSoFar = -1;
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
       if(p->state != RUNNABLE)
         continue;
 
-      // Switch to chosen process.  It is the process's job
-      // to release ptable.lock and then reacquire it
-      // before jumping back to us.
-      proc = p;
-      switchuvm(p);
-      p->state = RUNNING;
-      swtch(&cpu->scheduler, proc->context);
-      switchkvm();
+      if(prev == NULL) {
+        if(p->priority > maxSoFar) {
+          maxSoFar = p->priority;
+          proc = p;
+        }
+      }
+      else {
+        if(p->priority > prev->priority) {
+          proc = p;        
+          break;
+        }
+      }
+    
+    }
+
+    //
+    if(prev!=NULL) {
+      proc = prev;
+    }
+
+    switchuvm(proc);
+    proc->state = RUNNING;
+    swtch(&cpu->scheduler, proc->context);
+    switchkvm();
+
+
+    proc->ticks++;
+    proc->acc_ticks[proc->priority]++;
+
+    //run
+    if ((proc->priority != 0) && proc->ticks == (3-proc->priority+1)*8) {
+      proc->priority--;
+      proc->ticks = 0;
+    }
+    
+
+    //wait
+    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
+      if(p->state != RUNNABLE)
+        continue;
+
+      if(p!=proc) {
+        p->wait_ticks++;
+        p->acc_wait_ticks[p->priority]++;
+        if(p->priority == 2 && (p->wait_ticks == 160)) {
+          p->priority++;
+          p->wait_ticks = 0;
+        }
+        else if(p->priority == 1 && (p->wait_ticks == 320)) {
+          p->priority++;
+          p->wait_ticks = 0;
+        }
+        else if(p->priority == 0 && (p->wait_ticks == 500)) {
+          p->priority++;
+          p->wait_ticks = 0;
+        }
+        else {
+          
+        }
+      }
+    }
+
+
+
+    if(prev->state != RUNNABLE) {
+      prev = NULL;
+    }
+    else {
+      prev = proc;
+    }
+
+
+
+      // proc = p;
+      // switchuvm(p);
+      // p->state = RUNNING;
+      // swtch(&cpu->scheduler, proc->context);
+      // switchkvm();
 
       // Process is done running for now.
       // It should have changed its p->state before coming back.
-      proc = 0;
-    }
+    proc = 0;
+
+
+
     release(&ptable.lock);
 
   }
