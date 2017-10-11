@@ -289,6 +289,9 @@ scheduler(void)
       
       }
 
+      curr->ticks++;
+      curr->acc_ticks[curr->priority]++;
+
       //switch
       proc = curr;
       switchuvm(curr);
@@ -300,6 +303,7 @@ scheduler(void)
 
       //waiting ticks and upgrade
       curr->wait_ticks = 0;
+      curr->acc_wait_ticks[curr->priority] = 0;
       for(p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
         if(p->state != RUNNABLE)
           continue;
@@ -309,14 +313,19 @@ scheduler(void)
           if(p->priority == 2 && (p->wait_ticks == 160)) {
             p->priority++;
             p->wait_ticks = 0;
+                        p->acc_wait_ticks[p->priority] = 0;
           }
           else if(p->priority == 1 && (p->wait_ticks == 320)) {
             p->priority++;
             p->wait_ticks = 0;
+                        p->acc_wait_ticks[p->priority] = 0;
+
           }
           else if(p->priority == 0 && (p->wait_ticks == 500)) {
             p->priority++;
             p->wait_ticks = 0;
+                        p->acc_wait_ticks[p->priority] = 0;
+
           }
           else {
             
@@ -325,8 +334,7 @@ scheduler(void)
       }
 
       //running ticks and downgrade
-      curr->ticks++;
-      curr->acc_ticks[curr->priority]++;
+    
       // if ((curr->priority != 0) && curr->ticks == (3-curr->priority+1)*8) {
       //   curr->priority--;
       //   curr->ticks = 0;
@@ -335,6 +343,9 @@ scheduler(void)
       if((curr->priority != 0 && curr->ticks == timeslice[curr->priority])) {
         curr->priority--;
         curr->ticks = 0;
+        curr++;
+      }
+      if(curr->state!=RUNNABLE) {
         curr++;
       }
       proc = 0;
@@ -524,5 +535,4 @@ getpinfo(struct pstat *info)
   release(&ptable.lock);
   return 0;
 }
-
 
