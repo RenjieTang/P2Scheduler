@@ -73,7 +73,6 @@ found:
   p->ticks = 0;
  // p->wait_ticks = 0;
   memset(p->acc_ticks, 0, 4*sizeof(int));
-  // memset(p->acc_wait_ticks, 0, 4*sizeof(int));
   memset(p->wait_ticks, 0, 4*sizeof(int));
 
   return p;
@@ -265,6 +264,7 @@ scheduler(void)
 {
   struct proc *p;
   int timeslice[4] = {0, 32, 16, 8};
+  int waitslice[4] = {500, 320, 160, 0};
  // struct proc *prev;
   struct proc *curr;
 
@@ -309,30 +309,40 @@ scheduler(void)
       for(p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
         if(p->state != RUNNABLE)
           continue;
-        if(p!=curr) {
-       //   p->wait_ticks++;
+
+
+        if(p!=curr){
           p->wait_ticks[p->priority]++;
-          if(p->priority == 2 && (p->wait_ticks[p->priority] == 160)) {
+          if(p->priority!=3 && p->wait_ticks[p->priority] == waitslice[p->priority]) {
             p->priority++;
-         //   p->wait_ticks = 0;
-                        p->wait_ticks[p->priority] = 0;
-          }
-          else if(p->priority == 1 && (p->wait_ticks[p->priority] == 320)) {
-            p->priority++;
-        //    p->wait_ticks = 0;
-                        p->wait_ticks[p->priority] = 0;
-
-          }
-          else if(p->priority == 0 && (p->wait_ticks[p->priority] == 500)) {
-            p->priority++;
-          //  p->wait_ticks = 0;
-                        p->wait_ticks[p->priority] = 0;
-
-          }
-          else {
-            
+            p->wait_ticks[p->priority] = 0;
           }
         }
+
+       //  if(p!=curr) {
+       // //   p->wait_ticks++;
+       //    p->wait_ticks[p->priority]++;
+       //    if(p->priority == 2 && (p->wait_ticks[p->priority] == 160)) {
+       //      p->priority++;
+       //   //   p->wait_ticks = 0;
+       //                  p->wait_ticks[p->priority] = 0;
+       //    }
+       //    else if(p->priority == 1 && (p->wait_ticks[p->priority] == 320)) {
+       //      p->priority++;
+       //  //    p->wait_ticks = 0;
+       //                  p->wait_ticks[p->priority] = 0;
+
+       //    }
+       //    else if(p->priority == 0 && (p->wait_ticks[p->priority] == 500)) {
+       //      p->priority++;
+       //    //  p->wait_ticks = 0;
+       //                  p->wait_ticks[p->priority] = 0;
+
+       //    }
+       //    else {
+            
+       //    }
+       //  }
       }
 
       //running ticks and downgrade
@@ -347,9 +357,13 @@ scheduler(void)
         curr->ticks = 0;
         curr++;
       }
-      if(curr->state!=RUNNABLE) {
-        curr++;
-      }
+
+    
+
+
+      // if(curr->state!=RUNNABLE) {
+      //   curr++;
+      // }
       proc = 0;
   }
   release(&ptable.lock);
