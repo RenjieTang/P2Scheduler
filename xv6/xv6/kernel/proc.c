@@ -71,9 +71,11 @@ found:
 
   p->priority = 3;
   p->ticks = 0;
-  p->wait_ticks = 0;
+ // p->wait_ticks = 0;
   memset(p->acc_ticks, 0, 4*sizeof(int));
-  memset(p->acc_wait_ticks, 0, 4*sizeof(int));
+  // memset(p->acc_wait_ticks, 0, 4*sizeof(int));
+  memset(p->wait_ticks, 0, 4*sizeof(int));
+
   return p;
 }
 
@@ -302,29 +304,29 @@ scheduler(void)
  
 
       //waiting ticks and upgrade
-      curr->wait_ticks = 0;
-      curr->acc_wait_ticks[curr->priority] = 0;
+    //  curr->wait_ticks = 0;
+      curr->wait_ticks[curr->priority] = 0;
       for(p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
         if(p->state != RUNNABLE)
           continue;
         if(p!=curr) {
-          p->wait_ticks++;
-          p->acc_wait_ticks[p->priority]++;
-          if(p->priority == 2 && (p->wait_ticks == 160)) {
+       //   p->wait_ticks++;
+          p->wait_ticks[p->priority]++;
+          if(p->priority == 2 && (p->wait_ticks[p->priority] == 160)) {
             p->priority++;
-            p->wait_ticks = 0;
-                        p->acc_wait_ticks[p->priority] = 0;
+         //   p->wait_ticks = 0;
+                        p->wait_ticks[p->priority] = 0;
           }
-          else if(p->priority == 1 && (p->wait_ticks == 320)) {
+          else if(p->priority == 1 && (p->wait_ticks[p->priority] == 320)) {
             p->priority++;
-            p->wait_ticks = 0;
-                        p->acc_wait_ticks[p->priority] = 0;
+        //    p->wait_ticks = 0;
+                        p->wait_ticks[p->priority] = 0;
 
           }
-          else if(p->priority == 0 && (p->wait_ticks == 500)) {
+          else if(p->priority == 0 && (p->wait_ticks[p->priority] == 500)) {
             p->priority++;
-            p->wait_ticks = 0;
-                        p->acc_wait_ticks[p->priority] = 0;
+          //  p->wait_ticks = 0;
+                        p->wait_ticks[p->priority] = 0;
 
           }
           else {
@@ -527,7 +529,7 @@ getpinfo(struct pstat *info)
 
     for(int j = 0; j < 4; j++) {
       info->ticks[i][j] = p->acc_ticks[j];
-      info->wait_ticks[i][j] = p->acc_wait_ticks[j];
+      info->wait_ticks[i][j] = p->wait_ticks[j];
     }
 
     i++;
