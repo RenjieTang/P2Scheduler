@@ -70,9 +70,7 @@ found:
   p->context->eip = (uint)forkret;
 
   p->priority = 3;
-  p->ticks = 0;
- // p->wait_ticks = 0;
-  memset(p->acc_ticks, 0, 4*sizeof(int));
+  memset(p->ticks, 0, 4*sizeof(int));
   memset(p->wait_ticks, 0, 4*sizeof(int));
 
   return p;
@@ -291,8 +289,7 @@ scheduler(void)
       
       }
 
-      curr->ticks++;
-      curr->acc_ticks[curr->priority]++;
+      curr->ticks[curr->priority]++;
 
       //switch
       proc = curr;
@@ -304,7 +301,6 @@ scheduler(void)
  
 
       //waiting ticks and upgrade
-    //  curr->wait_ticks = 0;
       curr->wait_ticks[curr->priority] = 0;
       for(p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
         if(p->state != RUNNABLE)
@@ -318,52 +314,12 @@ scheduler(void)
             p->wait_ticks[p->priority] = 0;
           }
         }
-
-       //  if(p!=curr) {
-       // //   p->wait_ticks++;
-       //    p->wait_ticks[p->priority]++;
-       //    if(p->priority == 2 && (p->wait_ticks[p->priority] == 160)) {
-       //      p->priority++;
-       //   //   p->wait_ticks = 0;
-       //                  p->wait_ticks[p->priority] = 0;
-       //    }
-       //    else if(p->priority == 1 && (p->wait_ticks[p->priority] == 320)) {
-       //      p->priority++;
-       //  //    p->wait_ticks = 0;
-       //                  p->wait_ticks[p->priority] = 0;
-
-       //    }
-       //    else if(p->priority == 0 && (p->wait_ticks[p->priority] == 500)) {
-       //      p->priority++;
-       //    //  p->wait_ticks = 0;
-       //                  p->wait_ticks[p->priority] = 0;
-
-       //    }
-       //    else {
-            
-       //    }
-       //  }
       }
-
-      //running ticks and downgrade
-    
-      // if ((curr->priority != 0) && curr->ticks == (3-curr->priority+1)*8) {
-      //   curr->priority--;
-      //   curr->ticks = 0;
-      //   curr++;
-      // }
-      if((curr->priority != 0 && curr->ticks == timeslice[curr->priority])) {
+      if((curr->priority != 0 && (curr->ticks[curr->priority])%(timeslice[curr->priority]) == 0)) {
         curr->priority--;
-        curr->ticks = 0;
+        curr->ticks[curr->priority] = 0;
         curr++;
       }
-
-    
-
-
-      // if(curr->state!=RUNNABLE) {
-      //   curr++;
-      // }
       proc = 0;
   }
   release(&ptable.lock);
@@ -542,7 +498,7 @@ getpinfo(struct pstat *info)
     info->state[i] = p->state;
 
     for(int j = 0; j < 4; j++) {
-      info->ticks[i][j] = p->acc_ticks[j];
+      info->ticks[i][j] = p->ticks[j];
       info->wait_ticks[i][j] = p->wait_ticks[j];
     }
 
